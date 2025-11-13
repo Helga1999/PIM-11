@@ -1,0 +1,414 @@
+EM PYTHON:  
+# ==============================================
+# SISTEMA ACADÊMICO COLABORATIVO (Protótipo)
+# ==============================================
+# Contém as Sprints 1 a 4
+# Agora inclui integração com o módulo em C para cadastro de notas.
+# ==============================================
+
+import subprocess
+import os
+
+# Dicionário que armazena os usuários cadastrados.
+# Cada usuário tem uma senha e um perfil (admin, professor ou aluno)
+usuarios = {
+    "admin": {"senha": "admin123", "perfil": "admin"},
+    "professor1": {"senha": "prof123", "perfil": "professor"},
+    "aluno1": {"senha": "aluno123", "perfil": "aluno"}
+}
+
+# Estruturas de dados para as demais funcionalidades
+turmas = {}         # Dicionário com as turmas e seus alunos
+frequencia = {}     # Registro de presença por turma e aluno
+materiais = {}      # Materiais enviados por turma
+chat = []           # Lista de mensagens do chat
+alunos = []         # Lista com alunos cadastrados (nome, RA, nota)
+usuario_logado = None  # Guarda o usuário atualmente logado
+
+
+# ===========================================================
+# 🟦 SPRINT 1 - AUTENTICAÇÃO
+# ===========================================================
+
+def login():
+    """Realiza o login verificando nome e senha do usuário."""
+    global usuario_logado
+    nome = input("Usuário: ")
+    senha = input("Senha: ")
+    if nome in usuarios and usuarios[nome]["senha"] == senha:
+        usuario_logado = nome
+        print(f"\n Login realizado como {nome} ({usuarios[nome]['perfil']})\n")
+    else:
+        print("\n Usuário ou senha incorretos.\n")
+
+
+def logout():
+    """Encerra a sessão do usuário logado."""
+    global usuario_logado
+    if usuario_logado:
+        print(f"{usuario_logado} saiu do sistema.\n")
+        usuario_logado = None
+    else:
+        print("Nenhum usuário logado.\n")
+
+
+def recuperar_senha():
+    """Permite redefinir a senha caso o usuário exista."""
+    nome = input("Digite seu usuário: ")
+    if nome in usuarios:
+        nova = input("Nova senha: ")
+        usuarios[nome]["senha"] = nova
+        print("Senha redefinida com sucesso!\n")
+    else:
+        print("Usuário não encontrado.\n")
+
+
+def sprint1_menu():
+    """Menu da Sprint 1: opções de autenticação."""
+    while True:
+        print("=== AUTENTICAÇÃO ===")
+        print("1. Login")
+        print("2. Logout")
+        print("3. Recuperar senha")
+        print("4. Ver usuários")
+        print("0. Voltar")
+        opc = input("Escolha: ")
+
+        if opc == "1":
+            login()
+        elif opc == "2":
+            logout()
+        elif opc == "3":
+            recuperar_senha()
+        elif opc == "4":
+            for u, d in usuarios.items():
+                print(f"{u} - {d['perfil']}")
+            print()
+        elif opc == "0":
+            break
+        else:
+            print("Opção inválida.\n")
+
+
+# ===========================================================
+# 🟩 SPRINT 2 - GESTÃO ACADÊMICA
+# ===========================================================
+
+def cadastrar_usuario():
+    """Adiciona um novo usuário (aluno ou professor)."""
+    nome = input("Nome do usuário: ")
+    perfil = input("Perfil (aluno/professor): ").lower()
+    senha = input("Senha: ")
+    usuarios[nome] = {"senha": senha, "perfil": perfil}
+    print(f"{perfil.capitalize()} '{nome}' cadastrado.\n")
+
+
+def criar_turma():
+    """Cria uma nova turma."""
+    nome = input("Nome da turma: ")
+    turmas[nome] = []
+    print(f"Turma '{nome}' criada.\n")
+
+
+def matricular_aluno():
+    """Matricula um aluno em uma turma existente."""
+    aluno = input("Aluno: ")
+    turma = input("Turma: ")
+    if aluno in usuarios and usuarios[aluno]["perfil"] == "aluno" and turma in turmas:
+        turmas[turma].append(aluno)
+        print(f"{aluno} matriculado em {turma}.\n")
+    else:
+        print("Aluno ou turma inválidos.\n")
+
+
+def listar_turmas():
+    """Exibe todas as turmas e seus alunos."""
+    print("=== TURMAS ===")
+    for turma, lista_alunos in turmas.items():
+        print(f"{turma}: {', '.join(lista_alunos) if lista_alunos else 'Sem alunos'}")
+    print()
+
+
+def sprint2_menu():
+    """Menu da Sprint 2: gestão de usuários e turmas."""
+    while True:
+        print("=== GESTÃO ACADÊMICA ===")
+        print("1. Cadastrar usuário")
+        print("2. Criar turma")
+        print("3. Matricular aluno")
+        print("4. Listar turmas")
+        print("0. Voltar")
+        opc = input("Escolha: ")
+
+        if opc == "1":
+            cadastrar_usuario()
+        elif opc == "2":
+            criar_turma()
+        elif opc == "3":
+            matricular_aluno()
+        elif opc == "4":
+            listar_turmas()
+        elif opc == "0":
+            break
+        else:
+            print("Opção inválida.\n")
+
+
+# ===========================================================
+# 🟨 SPRINT 3 - AULAS, CONTEÚDO E CADASTRO DE NOTAS (C)
+# ===========================================================
+
+def cadastrar_aluno():
+    """Cadastra aluno na lista geral (para vincular notas)."""
+    nome = input("Nome do aluno: ")
+    ra = input("RA do aluno: ")
+    aluno = {"nome": nome, "ra": ra, "nota_final": None}
+    alunos.append(aluno)
+    print(f"Aluno(a) {nome} cadastrado(a) com sucesso!\n")
+
+
+def listar_alunos():
+    """Lista os alunos cadastrados e suas notas."""
+    if not alunos:
+        print("Nenhum aluno cadastrado.\n")
+        return
+
+    print("\n=== Alunos Cadastrados ===")
+    for i, aluno in enumerate(alunos, start=1):
+        nota = aluno["nota_final"]
+        nota_texto = f"{nota:.2f}" if nota is not None else "Sem nota"
+        print(f"{i}. {aluno['nome']} (RA: {aluno['ra']}) - Nota Final: {nota_texto}")
+    print()
+
+
+def cadastrar_notas():
+    #Chama o programa em C para calcular notas e salva a média no aluno.
+    if not alunos:
+        print("Nenhum aluno cadastrado!\n")
+        return
+
+    print("\n=== Escolha o aluno ===")
+    for i, aluno in enumerate(alunos, start=1):
+        print(f"{i}. {aluno['nome']}")
+    try:
+        escolha = int(input("Número do aluno: ")) - 1
+        aluno = alunos[escolha]
+    except (ValueError, IndexError):
+        print("Opção inválida.\n")
+        return
+
+    # Compila o programa C se necessário
+    if not os.path.exists("cadastrar_notas"):
+        print("Compilando o módulo C...")
+        subprocess.run(["gcc", "cadastrar_notas.c", "-o", "cadastrar_notas"], check=True)
+
+    print(f"\n--- Cadastro de notas para {aluno['nome']} ---\n")
+    subprocess.run(["./cadastrar_notas"])
+
+    # Lê a média calculada pelo C
+    if os.path.exists("saida_notas.txt"):
+        with open("saida_notas.txt", "r") as f:
+            media_str = f.read().strip()
+            try:
+                media = float(media_str)
+                aluno["nota_final"] = media
+                print(f"\n✅ Média {media:.2f} registrada para {aluno['nome']}!\n")
+            except ValueError:
+                print("Erro: média inválida no arquivo.\n")
+    else:
+        print("Nenhum resultado foi gerado pelo módulo C.\n")
+
+
+def registrar_frequencia():
+    """Registra presença ou falta de um aluno em uma turma."""
+    turma = input("Turma: ")
+    aluno = input("Aluno: ")
+    presente = input("Presente (s/n): ").lower() == 's'
+    frequencia.setdefault(turma, {})[aluno] = "Presente" if presente else "Faltou"
+    print(" Frequência registrada!\n")
+
+
+def upload_material():
+    """Adiciona um material (PDF, vídeo, etc.) a uma turma."""
+    turma = input("Turma: ")
+    material = input("Nome do material: ")
+    materiais.setdefault(turma, []).append(material)
+    print(f" Material '{material}' adicionado à turma '{turma}'.\n")
+
+
+def listar_materiais():
+    """Lista todos os materiais disponíveis por turma."""
+    print("=== MATERIAIS DE AULA ===")
+    for turma, lista in materiais.items():
+        print(f"{turma}: {', '.join(lista)}")
+    print()
+
+
+def sprint3_menu():
+    """Menu da Sprint 3: aulas, materiais e notas (C)."""
+    while True:
+        print("\n=== SPRINT 3 - AULAS E NOTAS ===")
+        print("1. Cadastrar aluno")
+        print("2. Listar alunos")
+        print("3. Cadastrar notas (módulo em C)")
+        print("4. Registrar frequência")
+        print("5. Upload de material")
+        print("6. Listar materiais")
+        print("0. Voltar")
+        opc = input("Escolha: ")
+
+        if opc == "1":
+            cadastrar_aluno()
+        elif opc == "2":
+            listar_alunos()
+        elif opc == "3":
+            cadastrar_notas()
+        elif opc == "4":
+            registrar_frequencia()
+        elif opc == "5":
+            upload_material()
+        elif opc == "6":
+            listar_materiais()
+        elif opc == "0":
+            break
+        else:
+            print("Opção inválida.\n")
+
+
+# ===========================================================
+# 🟧 SPRINT 4 - COMUNICAÇÃO
+# ===========================================================
+
+def enviar_mensagem():
+    """Permite enviar uma mensagem para o chat."""
+    usuario = input("Usuário: ")
+    msg = input("Mensagem: ")
+    chat.append(f"{usuario}: {msg}")
+    print(" Mensagem enviada!\n")
+
+
+def listar_mensagens():
+    """Exibe todas as mensagens trocadas no chat."""
+    print("=== CHAT ESCOLAR ===")
+    for m in chat:
+        print(m)
+    print()
+
+
+def sprint4_menu():
+    """Menu da Sprint 4: comunicação por chat."""
+    while True:
+        print("=== COMUNICAÇÃO ===")
+        print("1. Enviar mensagem")
+        print("2. Ver chat")
+        print("0. Voltar")
+        opc = input("Escolha: ")
+
+        if opc == "1":
+            enviar_mensagem()
+        elif opc == "2":
+            listar_mensagens()
+        elif opc == "0":
+            break
+        else:
+            print("Opção inválida.\n")
+
+
+# ===========================================================
+# 🏁 MENU PRINCIPAL
+# ===========================================================
+
+def menu_principal():
+    """Menu principal do sistema acadêmico."""
+    while True:
+        print("===================================")
+        print("  SISTEMA ACADÊMICO COLABORATIVO  ")
+        print("===================================")
+        print("1. Autenticação")
+        print("2. Gestão Acadêmica")
+        print("3. Aulas, Conteúdo e Notas (C)")
+        print("4. Comunicação")
+        print("0. Sair")
+        opc = input("Escolha: ")
+
+        if opc == "1":
+            sprint1_menu()
+        elif opc == "2":
+            sprint2_menu()
+        elif opc == "3":
+            sprint3_menu()
+        elif opc == "4":
+            sprint4_menu()
+        elif opc == "0":
+            print(" Encerrando sistema...")
+            break
+        else:
+            print("Opção inválida.\n")
+
+
+# Executa o menu principal apenas se o arquivo for executado diretamente
+if __name__ == "__main__":
+    menu_principal()
+
+
+
+EM C:
+#include <stdio.h>
+
+int main() 
+{
+    float np1, np2, pim, exame, media;
+    char continuar;
+
+    do {
+        printf("\n=== Cadastro de Notas ===\n");
+
+        printf("Digite a nota NP1: ");     // Solicita a nota NP1
+        scanf("%f", &np1);
+
+        printf("Digite a nota NP2: ");     // Solicita a nota NP2 
+        scanf("%f", &np2);
+
+        printf("Digite a nota PIM: ");     // Solicita a nota PIM
+        scanf("%f", &pim);
+
+        media = (4 * np1 + 4 * np2 + 2 * pim) / 10;    // Calcula a média
+        printf("\nMédia = %.2f\n", media);
+
+        if (media >= 7.0f)            // Verifica a situação do aluno
+        {
+            printf("Aluno(a) APROVADO(A)!\n");
+        } else                               // Se a média for menor que 7.0
+        {
+            printf("Aluno(a) de EXAME!\n");
+            printf("Digite a nota do exame: ");   // Solicita a nota do exame
+            scanf("%f", &exame);
+            media = (media + exame) / 2;      // Calcula a nova média
+
+            if (media >= 5.0f)      
+            {
+                printf("Aluno(a) APROVADO(A) com exame.\n");
+            } else 
+            {
+                printf("Aluno(a) REPROVADO(A)!\n");
+            }
+
+            printf("Média final com exame = %.2f\n", media);   // Exige a média final com exame
+        }
+
+        // Grava a média final no arquivo (para o Python ler)
+        FILE *arquivo = fopen("saida_notas.txt", "w");
+        if (arquivo != NULL) 
+        {
+            fprintf(arquivo, "%.2f", media);
+            fclose(arquivo);
+        }
+
+        printf("\nDeseja cadastrar novas notas? (s/n): ");
+        scanf(" %c", &continuar);
+
+    } while (continuar == 's' || continuar == 'S');
+
+    printf("\nEncerrando o cadastro de notas.\n");
+    return 0;
+}
